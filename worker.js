@@ -93,27 +93,7 @@ export default {
       await callTelegram("answerCallbackQuery", payload);
     }
 
-    // --- New Year events definitions ---
-
     // --- KV helpers for events & bookings ---
-    async function getEventState(eventId) {
-      const key = `event:${eventId}`;
-      let raw = await env.EVENTS.get(key);
-      let state = null;
-
-      if (raw) {
-        try { state = JSON.parse(raw); } catch (e) { console.log("EVENTS parse error", String(e)); }
-      }
-      if (!state) {
-        state = { capacity: 40, booked: 0 };
-        await env.EVENTS.put(key, JSON.stringify(state));
-      }
-      return { key, state };
-    }
-
-    async function saveEventState(key, state) {
-      await env.EVENTS.put(key, JSON.stringify(state));
-    }
 
     async function getBooking(bookingId) {
       const raw = await env.BOOKINGS.get(`booking:${bookingId}`);
@@ -223,12 +203,6 @@ export default {
         if (booking.status === "confirmed") {
           await answerCallbackQuery(cbId, "Заявка уже подтверждена.");
           return;
-        }
-
-          }
-
-          state.booked += people;
-          await saveEventState(key, state);
         }
 
         booking.status = "confirmed";
@@ -379,9 +353,7 @@ export default {
       if (text.startsWith("/start")) {
         const parts = text.split(" ");
         const param = parts[1];
-
-        }
-      }
+       }
 
       await clearState();
       await sendMessage(chatId, "Добро пожаловать на Ферму Голубой Коровы!\n\nВыберите действие:", mainKeyboard);
@@ -438,36 +410,6 @@ export default {
           "Купить можно в фермерском магазине.",
         mainKeyboard
       );
-      return new Response("OK");
-    }
-
-    // --- New Year events flow ---
-
-      const booking = await createBooking(bookingData);
-
-      // Admin notification (plain text, safe)
-      const adminText =
-        "Новая заявка на НОВОГОДНЕЕ мероприятие:\n\n" +
-        `ID: ${booking.id}\n` +
-        `Мероприятие: ${session.nyEventTitle}\n` +
-        `Дата: ${session.nyEventDate}\n\n` +
-        `Имя: ${session.name}\n` +
-        `Гостей: ${session.people}\n` +
-        `Контакт: ${session.contact}\n` +
-        `Telegram: ${username}`;
-
-      if (env.ADMIN_CHAT_ID) {
-        await callTelegram("sendMessage", {
-          chat_id: env.ADMIN_CHAT_ID,
-          text: adminText,
-          reply_markup: buildAdminBookingKeyboard(booking.id),
-        });
-      } else {
-        console.log("ADMIN_CHAT_ID is empty — cannot notify admin");
-      }
-
-      await sendMessage(chatId, "Спасибо! Ваша заявка на новогоднее мероприятие отправлена. Мы свяжемся с вами для подтверждения.", mainKeyboard);
-      await clearState();
       return new Response("OK");
     }
 
