@@ -94,15 +94,6 @@ export default {
     }
 
     // --- New Year events definitions ---
-    const winterEvents = [
-      { id: "ny-03", label: "03.01 — Ёлка у Снежной королевы", date: "03.01", title: "Ёлка у Снежной королевы" },
-      { id: "ny-04", label: "04.01 — Дегустация «Мир холодца и студня» (Коллагеновый день)", date: "04.01", title: "Дегустация «Мир холодца и студня» (Коллагеновый день)" },
-      { id: "ny-05", label: "05.01 — Сырные традиции народов мира: Индия, Италия, Франция", date: "05.01", title: "Сырные традиции народов мира: Индия, Италия, Франция" },
-      { id: "ny-06", label: "06.01 — Детская программа «Коза-Дереза и её африканские родственники»", date: "06.01", title: "Детская программа «Коза-Дереза и её африканские родственники»" },
-      { id: "ny-07", label: "07.01 — «От носа до хвоста»: дегустация сыров и стейки", date: "07.01", title: "«От носа до хвоста»: дегустация сыров и стейки" },
-      { id: "ny-08", label: "08.01 — Дегустация «Пицца и каннеллони»", date: "08.01", title: "Дегустация «Пицца и каннеллони»" },
-      { id: "ny-09", label: "09.01 — Русский день. «Зимние традиции и угощения»", date: "09.01", title: "Русский день. «Зимние традиции и угощения»" },
-    ];
 
     // --- KV helpers for events & bookings ---
     async function getEventState(eventId) {
@@ -193,62 +184,6 @@ export default {
       };
     }
 
-    // --- /events summary + detail ---
-    async function sendEventsSummaryMessage(chatId) {
-      const lines = [];
-      for (const ev of winterEvents) {
-        const { state } = await getEventState(ev.id);
-        const free = state.capacity - state.booked;
-        const status = free <= 0 ? "приём закрыт" : `свободно ${free}`;
-        lines.push(`${ev.date} — ${ev.title}: ${state.booked}/${state.capacity} (${status})`);
-      }
-      await sendMessage(chatId, "Сводка по новогодним мероприятиям:\n\n" + lines.join("\n"));
-    }
-
-    async function sendEventDetailMessage(chatId, eventId) {
-      const ev = winterEvents.find(e => e.id === eventId);
-      if (!ev) {
-        await sendMessage(chatId, "Мероприятие не найдено.");
-        return;
-      }
-
-      const { state } = await getEventState(ev.id);
-      const confirmedSeats = state.booked;
-      const free = state.capacity - confirmedSeats;
-
-      let bookingsText = "";
-      let list;
-      try {
-        list = await env.BOOKINGS.list({ prefix: "booking:" });
-      } catch (e) {
-        console.log("BOOKINGS list error", String(e));
-        list = { keys: [] };
-      }
-
-      for (const key of list.keys || []) {
-        const raw = await env.BOOKINGS.get(key.name);
-        if (!raw) continue;
-        let b;
-        try { b = JSON.parse(raw); } catch { continue; }
-        if (b.type !== "ny_event" || b.nyEventId !== eventId) continue;
-
-        const people = parseInt(b.people || "0", 10) || 0;
-        const name = b?.data?.name ? b.data.name : "без имени";
-        const status = b.status || "new";
-        bookingsText += `- ${b.id} — ${status} — ${name}, ${people} гость(я)\n`;
-      }
-
-      const header =
-        `Мероприятие: ${ev.title} (${ev.date})\n` +
-        `Всего мест: ${state.capacity}\n` +
-        `Занято (подтверждено): ${confirmedSeats}\n` +
-        `Свободно: ${free}\n\n` +
-        `Заявки:\n`;
-
-      const text = bookingsText ? header + bookingsText : header + "пока нет заявок.";
-      await sendMessage(chatId, text);
-    }
-
     // --- Callback handlers ---
     async function handleEventsSummaryCallback(callbackQuery) {
       const data = callbackQuery.data;
@@ -290,18 +225,6 @@ export default {
           return;
         }
 
-        if (booking.type === "ny_event" && booking.nyEventId) {
-          const { key, state } = await getEventState(booking.nyEventId);
-          const people = parseInt(booking.people || "0", 10) || 0;
-
-          if (people <= 0) {
-            await answerCallbackQuery(cbId, "Некорректное количество гостей.");
-            return;
-          }
-          if (state.booked + people > state.capacity) {
-            const free = state.capacity - state.booked;
-            await answerCallbackQuery(cbId, `Недостаточно мест. Свободно: ${free < 0 ? 0 : free}.`);
-            return;
           }
 
           state.booked += people;
@@ -312,10 +235,6 @@ export default {
         await saveBooking(booking);
 
         let adminText = `Заявка ${booking.id} подтверждена.\n\n`;
-        if (booking.type === "ny_event" && booking.nyEventId) {
-          const ev = winterEvents.find(e => e.id === booking.nyEventId);
-          if (ev) adminText += `Мероприятие: ${ev.title} (${ev.date})\n`;
-        }
         if (booking.data) {
           if (booking.data.date) adminText += `Дата: ${booking.data.date}\n`;
           if (booking.data.time) adminText += `Время: ${booking.data.time}\n`;
@@ -331,13 +250,6 @@ export default {
 
         if (booking.chatId) {
           let userText = `Ваша заявка ${booking.id} подтверждена.`;
-          if (booking.type === "ny_event" && booking.nyEventId) {
-            const ev = winterEvents.find(e => e.id === booking.nyEventId);
-            if (ev) userText += `\nМероприятие: ${ev.title} (${ev.date}).`;
-          } else {
-            if (booking?.data?.date) userText += `\nДата: ${booking.data.date}`;
-            if (booking?.data?.time) userText += `\nВремя: ${booking.data.time}`;
-          }
           await sendMessage(booking.chatId, userText);
         }
 
@@ -355,10 +267,6 @@ export default {
         await saveBooking(booking);
 
         let adminText = `Заявка ${booking.id} отклонена.\n\n`;
-        if (booking.type === "ny_event" && booking.nyEventId) {
-          const ev = winterEvents.find(e => e.id === booking.nyEventId);
-          if (ev) adminText += `Мероприятие: ${ev.title} (${ev.date})\n`;
-        }
         if (booking.data) {
           if (booking.data.date) adminText += `Дата: ${booking.data.date}\n`;
           if (booking.data.time) adminText += `Время: ${booking.data.time}\n`;
@@ -446,7 +354,6 @@ export default {
     function buildMainKeyboard(isAdminUser) {
       const rows = [
         [{ text: "📅 Записаться на экскурсию" }],
-        [{ text: "❄ Новогодние мероприятия" }],
         [{ text: "🐄 Экскурсии" }, { text: "📅 Расписание" }],
         [{ text: "🛒 Продукция" }, { text: "📍 Как добраться" }],
         [{ text: "🔄 Сбросить заявку" }],
@@ -460,47 +367,11 @@ export default {
     const mainKeyboard = buildMainKeyboard(isAdminUser);
     const noKeyboard = { remove_keyboard: true };
 
-    // Admin-only events menu command (/events)
-    if (text === "/events" && isAdminUser) {
-      await sendMessage(chatId, "Выберите день:", buildAdminEventsMenuKeyboard());
-      return new Response("OK");
-    }
-
-    // Admin-only events menu command (button)
-    if (text === "📊 Сводка по мероприятиям") {
-      if (!isAdminUser) {
-        await sendMessage(chatId, "Этот раздел доступен только администратору.");
-        return new Response("OK");
-      }
-      await sendMessage(chatId, "Выберите день:", buildAdminEventsMenuKeyboard());
-      return new Response("OK");
-    }
-
     // Reset
     if (text === "🔄 Сбросить заявку") {
       await clearState();
       await sendMessage(chatId, "Заявка сброшена. Можете начать заново.", mainKeyboard);
       return new Response("OK");
-    }
-
-    async function startNyMenu(targetChatId) {
-      await setState({ step: "ny_choose" });
-
-      const winterKeyboard = {
-        keyboard: [
-          [{ text: winterEvents[0].label }],
-          [{ text: winterEvents[1].label }],
-          [{ text: winterEvents[2].label }],
-          [{ text: winterEvents[3].label }],
-          [{ text: winterEvents[4].label }],
-          [{ text: winterEvents[5].label }],
-          [{ text: winterEvents[6].label }],
-          [{ text: "🏡 Главное меню" }],
-        ],
-        resize_keyboard: true,
-      };
-
-      await sendMessage(targetChatId, "Выберите дату и новогоднее мероприятие:", winterKeyboard);
     }
 
     // Start / deep-link / main menu
@@ -509,27 +380,6 @@ export default {
         const parts = text.split(" ");
         const param = parts[1];
 
-        if (param === "ny-menu") {
-          await startNyMenu(chatId);
-          return new Response("OK");
-        }
-
-        if (param && param.startsWith("ny-")) {
-          const ev = winterEvents.find(e => e.id === param);
-          if (ev) {
-            const { state } = await getEventState(ev.id);
-            if (state.booked >= state.capacity) {
-              await sendMessage(chatId, `К сожалению, на ${ev.title} (${ev.date}) запись уже завершена.\n\nПожалуйста, выберите другое мероприятие.`, mainKeyboard);
-              await clearState();
-              return new Response("OK");
-            }
-
-            const newSession = { step: "ny_name", nyEventId: ev.id, nyEventTitle: ev.title, nyEventDate: ev.date };
-            await setState(newSession);
-
-            await sendMessage(chatId, `Вы выбрали ${ev.label}.\n\nКак вас зовут?`, noKeyboard);
-            return new Response("OK");
-          }
         }
       }
 
@@ -592,75 +442,6 @@ export default {
     }
 
     // --- New Year events flow ---
-    if (text === "❄ Новогодние мероприятия") {
-      await startNyMenu(chatId);
-      return new Response("OK");
-    }
-
-    if (session.step === "ny_choose") {
-      const chosen = winterEvents.find(ev => ev.label === text);
-      if (!chosen) {
-        await sendMessage(chatId, "Пожалуйста, выберите мероприятие из списка кнопок.");
-        return new Response("OK");
-      }
-
-      const { state } = await getEventState(chosen.id);
-      if (state.booked >= state.capacity) {
-        await sendMessage(chatId, `К сожалению, на ${chosen.title} (${chosen.date}) запись уже завершена.\n\nПожалуйста, выберите другое мероприятие.`, mainKeyboard);
-        await clearState();
-        return new Response("OK");
-      }
-
-      session.step = "ny_name";
-      session.nyEventId = chosen.id;
-      session.nyEventTitle = chosen.title;
-      session.nyEventDate = chosen.date;
-      await setState(session);
-
-      await sendMessage(chatId, `Вы выбрали ${chosen.label}.\n\nКак вас зовут?`, noKeyboard);
-      return new Response("OK");
-    }
-
-    if (session.step === "ny_name") {
-      session.name = text;
-      session.step = "ny_people";
-      await setState(session);
-      await sendMessage(chatId, "Сколько гостей планируете привезти?", noKeyboard);
-      return new Response("OK");
-    }
-
-    if (session.step === "ny_people") {
-      session.people = text;
-      session.step = "ny_contact";
-      await setState(session);
-      await sendMessage(chatId, "Оставьте, пожалуйста, контакт (телефон или Telegram):", noKeyboard);
-      return new Response("OK");
-    }
-
-    if (session.step === "ny_contact") {
-      session.contact = text;
-
-      const peopleNum = parseInt(session.people || "0", 10) || 0;
-
-      const username =
-        message?.from?.username
-          ? `@${message.from.username}`
-          : "нет";
-
-      const bookingData = {
-        type: "ny_event",
-        chatId,
-        nyEventId: session.nyEventId,
-        people: peopleNum,
-        data: {
-          name: session.name,
-          date: session.nyEventDate,
-          people: session.people,
-          contact: session.contact,
-          nyEventTitle: session.nyEventTitle,
-          username,
-        },
-      };
 
       const booking = await createBooking(bookingData);
 
