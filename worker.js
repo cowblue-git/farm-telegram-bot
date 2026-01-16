@@ -29,19 +29,11 @@ export default {
 
     // --- Update helpers (message + callback_query) ---
     function getChatId(u) {
-      return (
-        u?.message?.chat?.id ??
-        u?.callback_query?.message?.chat?.id ??
-        null
-      );
+      return u?.message?.chat?.id ?? u?.callback_query?.message?.chat?.id ?? null;
     }
 
     function getFromId(u) {
-      return (
-        u?.message?.from?.id ??
-        u?.callback_query?.from?.id ??
-        null
-      );
+      return u?.message?.from?.id ?? u?.callback_query?.from?.id ?? null;
     }
 
     function isAdminUserId(userId) {
@@ -93,12 +85,17 @@ export default {
       await callTelegram("answerCallbackQuery", payload);
     }
 
-    // --- KV helpers for events & bookings ---
+    // --- KV helpers for bookings ---
 
     async function getBooking(bookingId) {
       const raw = await env.BOOKINGS.get(`booking:${bookingId}`);
       if (!raw) return null;
-      try { return JSON.parse(raw); } catch (e) { console.log("BOOKINGS parse error", String(e)); return null; }
+      try {
+        return JSON.parse(raw);
+      } catch (e) {
+        console.log("BOOKINGS parse error", String(e));
+        return null;
+      }
     }
 
     async function saveBooking(booking) {
@@ -109,10 +106,7 @@ export default {
     // Booking ID without underscores (prevents Markdown/entity issues even if parse_mode is used elsewhere)
     function generateBookingId(data) {
       const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-      const eventPart =
-        (data?.data?.date) ||
-        data?.nyEventDate ||
-        "na";
+      const eventPart = data?.data?.date || "na";
       const ts = Date.now();
       return `bk-${eventPart}-${today}-${ts}`;
     }
@@ -124,7 +118,6 @@ export default {
         type: data.type || "unknown",
         chatId: data.chatId,
         status: "new",
-        nyEventId: data.nyEventId || null,
         createdAt: Date.now(),
         people: data.people || 0,
         data: data.data || {},
@@ -145,43 +138,7 @@ export default {
       };
     }
 
-    function buildAdminEventsMenuKeyboard() {
-      return {
-        inline_keyboard: [
-          [{ text: "📊 Все мероприятия", callback_data: "events:all" }],
-          [
-            { text: "03.01", callback_data: "events:ny-03" },
-            { text: "04.01", callback_data: "events:ny-04" },
-            { text: "05.01", callback_data: "events:ny-05" },
-          ],
-          [
-            { text: "06.01", callback_data: "events:ny-06" },
-            { text: "07.01", callback_data: "events:ny-07" },
-            { text: "08.01", callback_data: "events:ny-08" },
-          ],
-          [{ text: "09.01", callback_data: "events:ny-09" }],
-        ],
-      };
-    }
-
     // --- Callback handlers ---
-    async function handleEventsSummaryCallback(callbackQuery) {
-      const data = callbackQuery.data;
-      const cbId = callbackQuery.id;
-      const fromChatId = callbackQuery.message.chat.id;
-
-      const suffix = data.split(":")[1];
-      if (suffix === "all") {
-        await sendEventsSummaryMessage(fromChatId);
-        await answerCallbackQuery(cbId, "Сводка отправлена сообщением.");
-        return;
-      }
-
-      const eventId = suffix; // e.g. ny-03
-      await sendEventDetailMessage(fromChatId, eventId);
-      await answerCallbackQuery(cbId, "Детали мероприятия отправлены.");
-    }
-
     async function handleAdminBookingAction(callbackQuery) {
       const data = callbackQuery.data || "";
       const cbId = callbackQuery.id;
@@ -223,7 +180,7 @@ export default {
         }
 
         if (booking.chatId) {
-          let userText = `Ваша заявка ${booking.id} подтверждена.`;
+          const userText = `Ваша заявка ${booking.id} подтверждена.`;
           await sendMessage(booking.chatId, userText);
         }
 
@@ -255,7 +212,10 @@ export default {
         }
 
         if (booking.chatId) {
-          await sendMessage(booking.chatId, `Ваша заявка ${booking.id} отклонена. Если это ошибка — свяжитесь с нами.`);
+          await sendMessage(
+            booking.chatId,
+            `Ваша заявка ${booking.id} отклонена. Если это ошибка — свяжитесь с нами.`
+          );
         }
 
         await answerCallbackQuery(cbId, "Заявка отклонена.");
@@ -276,10 +236,6 @@ export default {
       }
 
       const data = callbackQuery.data || "";
-      if (data.startsWith("events:")) {
-        await handleEventsSummaryCallback(callbackQuery);
-        return new Response("OK");
-      }
 
       if (data.startsWith("confirm:") || data.startsWith("cancel:")) {
         await handleAdminBookingAction(callbackQuery);
@@ -305,7 +261,12 @@ export default {
     let sessionRaw = await env.STATE.get(userKey);
     let session = {};
     if (sessionRaw) {
-      try { session = JSON.parse(sessionRaw); } catch (e) { console.log("STATE parse error", String(e)); session = {}; }
+      try {
+        session = JSON.parse(sessionRaw);
+      } catch (e) {
+        console.log("STATE parse error", String(e));
+        session = {};
+      }
     }
 
     if (session.expiresAt && now > session.expiresAt) {
@@ -324,21 +285,19 @@ export default {
       session = {};
     }
 
-    // --- Main keyboard (admin gets extra button) ---
-    function buildMainKeyboard(isAdminUser) {
+    // --- Main keyboard ---
+    function buildMainKeyboard() {
       const rows = [
         [{ text: "📅 Записаться на экскурсию" }],
         [{ text: "🐄 Экскурсии" }, { text: "📅 Расписание" }],
         [{ text: "🛒 Продукция" }, { text: "📍 Как добраться" }],
         [{ text: "🔄 Сбросить заявку" }],
+        [{ text: "🏡 Главное меню" }],
       ];
-      if (isAdminUser) rows.push([{ text: "📊 Сводка по мероприятиям" }]);
-      rows.push([{ text: "🏡 Главное меню" }]);
       return { keyboard: rows, resize_keyboard: true };
     }
 
-    const isAdminUser = isAdminUserId(message?.from?.id);
-    const mainKeyboard = buildMainKeyboard(isAdminUser);
+    const mainKeyboard = buildMainKeyboard();
     const noKeyboard = { remove_keyboard: true };
 
     // Reset
@@ -348,13 +307,8 @@ export default {
       return new Response("OK");
     }
 
-    // Start / deep-link / main menu
+    // Start / main menu
     if (text.startsWith("/start") || text === "🏡 Главное меню") {
-      if (text.startsWith("/start")) {
-        const parts = text.split(" ");
-        const param = parts[1];
-       }
-
       await clearState();
       await sendMessage(chatId, "Добро пожаловать на Ферму Голубой Коровы!\n\nВыберите действие:", mainKeyboard);
       return new Response("OK");
@@ -501,3 +455,4 @@ export default {
     return new Response("OK");
   },
 };
+
