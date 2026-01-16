@@ -1,0 +1,6 @@
+{
+  "name": "farm-telegram-bot",
+  "main": "worker.js",
+  "compatibility_date": "2026-01-17"
+}
+
