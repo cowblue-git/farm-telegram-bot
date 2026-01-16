@@ -16,6 +16,10 @@ Notes
 - Ручной деплой через Cloudflare Dashboard выведен из рабочего процесса.
 - Это базовый инфраструктурный шаг для дальнейших изменений через feature-ветки.
 
+Commits
+
+chore(bot): cleanup NY legacy code
+
 ---
 ## [2026-01-11]
 
