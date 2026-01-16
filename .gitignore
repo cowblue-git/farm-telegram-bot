@@ -1,3 +1,14 @@
+# macOS
 .DS_Store
+__MACOSX/
+
+# Environment
 .env
+
+# Cloudflare / Wrangler (пока ручной деплой)
 wrangler.toml
+
+# Editor / temp files
+*.swp
+*~
+
