@@ -1,4 +1,7 @@
 name = "farm-telegram-bot"
 main = "worker.js"
-compatibility_date = "2026-01-17"
+compatibility_date = "2026-01-16"
 
+
+# Чтобы убрать warning и сделать поведение стабильным:
+preview_urls = false
