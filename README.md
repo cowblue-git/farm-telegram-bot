@@ -72,6 +72,33 @@ ___
   ```bash
   npx wrangler deploy --config wrangler.toml
 
+## Deployment rules (important)
+
+Проект использует **Cloudflare Workers Builds** (Git → deploy).
+
+### Основные правила
+- `git push` в `main` = деплой в production.
+- Ручной деплой через Cloudflare Dashboard запрещён (кроме диагностики).
+- Локальный `npx wrangler deploy` используется только для тестов/отладки/аварийных сценариев.
+
+### Конфигурация окружения
+- `wrangler.toml` — единый источник правды для:
+  - entrypoint (`main`)
+  - KV bindings (`STATE`, `BOOKINGS`)
+  - vars (`ADMIN_USER_ID`, `ADMIN_CHAT_ID`)
+- `BOT_TOKEN` хранится только как Cloudflare Secret (не хранится в Git и не в `wrangler.toml`).
+
+### Secrets / Vars / Bindings
+- Secrets: `BOT_TOKEN`
+- Vars: `ADMIN_USER_ID`, `ADMIN_CHAT_ID`
+- KV bindings:
+  - `STATE` — пользовательские сессии
+  - `BOOKINGS` — заявки
+
+### Важно
+- Любые изменения bindings / vars / secrets — только осознанно, с проверкой webhook и smoke-test.
+- UX-изменения не должны затрагивать инфраструктурную конфигурацию.
+
 ---
 
 NY legacy удалён и события будут возвращены модульно.
