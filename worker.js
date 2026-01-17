@@ -8,30 +8,28 @@
 
 export default {
   async fetch(request, env, ctx) {
-    const url = new URL(request.url);
-
-    // Health check / any other path
-    if (url.pathname !== "/webhook") {
-      return new Response("OK", { status: 200 });
-    }
-
-    if (request.method !== "POST") {
-      return new Response("Method Not Allowed", { status: 405 });
-    }
-
-    let update;
+    // SAFETY: never let an unhandled error return 500 to Telegram.
+    // We log the error, but respond 200 OK so Telegram doesn't disable webhook.
     try {
-      update = await request.json();
-    } catch (e) {
-      console.log("JSON error", String(e));
-      return new Response("OK", { status: 200 });
-    }
-
-    // --- Update helpers (message + callback_query) ---
-    function getChatId(u) {
-      return u?.message?.chat?.id ?? u?.callback_query?.message?.chat?.id ?? null;
-    }
-
+      const url = new URL(request.url);
+      // Health check / any other path
+      if (url.pathname !== "/webhook") {
+        return new Response("OK", { status: 200 });
+      }
+      if (request.method !== "POST") {
+        return new Response("Method Not Allowed", { status: 405 });
+      }
+      let update;
+      try {
+        update = await request.json();
+      } catch (e) {
+        console.log("JSON error", String(e));
+        return new Response("OK", { status: 200 });
+      }
+      // --- Update helpers (message + callback_query) ---
+      function getChatId(u) {
+        return u?.message?.chat?.id ?? u?.callback_query?.message?.chat?.id ?? null;
+      }
     function getFromId(u) {
       return u?.message?.from?.id ?? u?.callback_query?.from?.id ?? null;
     }
@@ -505,6 +503,11 @@ export default {
 
     // Fallback
     await sendMessage(chatId, "Спасибо! Мы свяжемся с вами.", mainKeyboard);
+    } catch (err) {
+      console.log("UNHANDLED_WEBHOOK_ERROR", String(err), err?.stack || "");
+      // IMPORTANT: always 200 OK for Telegram
+      return new Response("OK", { status: 200 });
+    }
     return new Response("OK");
     // === /USER FLOW ==========================================================
   },
