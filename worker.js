@@ -309,8 +309,25 @@ export default {
       };
     }
 
+
+    // Step keyboard for ex_people:
+    // - people selection only (no free input)
+    // - keeps reset/menu always available
+    function buildExPeopleKeyboard() {
+      return {
+        keyboard: [
+          [{ text: "1" }, { text: "2" }, { text: "3" }],
+          [{ text: "4" }, { text: "5" }, { text: "6" }],
+          [{ text: "6–10" }, { text: "более 11" }],
+          [{ text: "🔄 Сбросить заявку" }, { text: "🏡 Главное меню" }],
+        ],
+        resize_keyboard: true,
+      };
+    }
+
     const mainKeyboard = buildMainKeyboard();
     const flowKeyboard = buildFlowKeyboard();
+    const exPeopleKeyboard = buildExPeopleKeyboard();
 
     // --- Global actions (must work in any state) ---
     // Глобальный сброс заявки. Должен срабатывать В ЛЮБОМ состоянии, включая ex_* шаги.
@@ -415,12 +432,27 @@ export default {
       session.time = text;
       session.step = "ex_people";
       await setState(session);
-      await sendMessage(chatId, "Сколько гостей будет?", flowKeyboard);
+      await sendMessage(chatId, "Сколько гостей будет?", exPeopleKeyboard);
       return new Response("OK");
     }
 
     if (session.step === "ex_people") {
-      session.people = text;
+      // Only accept button values
+      const allowed = new Set(["1", "2", "3", "4", "5", "6", "6–10", "более 11"]);
+      if (!allowed.has(text)) {
+        await sendMessage(
+          chatId,
+          "Пожалуйста, выберите количество гостей кнопкой ниже.",
+          exPeopleKeyboard
+        );
+        return new Response("OK");
+      }
+
+      // Keep stored value compatible with existing parseInt behavior downstream
+      // - "6–10" => "6-10"
+      // - "более 11" => "11+"
+      session.people = text === "6–10" ? "6-10" : text === "более 11" ? "11+" : text;
+
       session.step = "ex_contact";
       await setState(session);
       await sendMessage(chatId, "Ваш телефон или Telegram?", flowKeyboard);
