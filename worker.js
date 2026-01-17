@@ -86,7 +86,6 @@ export default {
     }
 
     // --- KV helpers for bookings ---
-
     async function getBooking(bookingId) {
       const raw = await env.BOOKINGS.get(`booking:${bookingId}`);
       if (!raw) return null;
@@ -126,7 +125,8 @@ export default {
       return booking;
     }
 
-    // --- Admin inline keyboards ---
+    // === ADMIN FLOW ==========================================================
+    // Admin inline keyboard for booking approval / rejection
     function buildAdminBookingKeyboard(bookingId) {
       return {
         inline_keyboard: [
@@ -138,7 +138,7 @@ export default {
       };
     }
 
-    // --- Callback handlers ---
+    // Callback handlers (admin actions)
     async function handleAdminBookingAction(callbackQuery) {
       const data = callbackQuery.data || "";
       const cbId = callbackQuery.id;
@@ -225,7 +225,7 @@ export default {
       await answerCallbackQuery(cbId, "Неизвестное действие.");
     }
 
-    // --- Handle callback_query first ---
+    // --- Handle callback_query first (ADMIN FLOW) ---
     if (update.callback_query) {
       const callbackQuery = update.callback_query;
       const fromId = callbackQuery?.from?.id;
@@ -245,7 +245,9 @@ export default {
       await answerCallbackQuery(callbackQuery.id, "Неизвестная команда.");
       return new Response("OK");
     }
+    // === /ADMIN FLOW =========================================================
 
+    // === USER FLOW ===========================================================
     // --- Handle normal messages (ignore non-message updates like web_app_data only) ---
     const message = update.message;
     if (!message) {
@@ -285,7 +287,7 @@ export default {
       session = {};
     }
 
-    // --- Main keyboard ---
+    // --- Keyboards ---
     function buildMainKeyboard() {
       const rows = [
         [{ text: "📅 Записаться на экскурсию" }],
@@ -297,17 +299,28 @@ export default {
       return { keyboard: rows, resize_keyboard: true };
     }
 
-    const mainKeyboard = buildMainKeyboard();
-    const noKeyboard = { remove_keyboard: true };
+    // Flow keyboard используется ТОЛЬКО во время экскурсионного флоу.
+    // Важно: НЕ использовать remove_keyboard, чтобы пользователь
+    // всегда мог нажать "🔄 Сбросить заявку" или "🏡 Главное меню".
+    function buildFlowKeyboard() {
+      return {
+        keyboard: [[{ text: "🔄 Сбросить заявку" }, { text: "🏡 Главное меню" }]],
+        resize_keyboard: true,
+      };
+    }
 
-    // Reset
+    const mainKeyboard = buildMainKeyboard();
+    const flowKeyboard = buildFlowKeyboard();
+
+    // --- Global actions (must work in any state) ---
+    // Глобальный сброс заявки. Должен срабатывать В ЛЮБОМ состоянии, включая ex_* шаги.
     if (text === "🔄 Сбросить заявку") {
       await clearState();
       await sendMessage(chatId, "Заявка сброшена. Можете начать заново.", mainKeyboard);
       return new Response("OK");
     }
 
-    // Start / main menu
+    // Start / main menu (also exits any flow)
     if (text.startsWith("/start") || text === "🏡 Главное меню") {
       await clearState();
       await sendMessage(chatId, "Добро пожаловать на Ферму Голубой Коровы!\n\nВыберите действие:", mainKeyboard);
@@ -368,17 +381,25 @@ export default {
     }
 
     // --- Excursion booking flow (no capacity control) ---
+    // Вход в экскурсионный сценарий.
+    // ВАЖНО: сразу показываем flow keyboard, чтобы кнопки были доступны с первого шага.
     if (text === "📅 Записаться на экскурсию") {
       await setState({ step: "ex_name" });
-      await sendMessage(chatId, "Как вас зовут?", noKeyboard);
+      await sendMessage(
+        chatId,
+        "Как вас зовут?\n\nВы можете в любой момент сбросить заявку или вернуться в главное меню.",
+        flowKeyboard
+      );
       return new Response("OK");
     }
 
+    // Каждый шаг экскурсионного флоу ОБЯЗАН использовать flowKeyboard.
+    // Это гарантирует, что пользователь не застрянет в сценарии.
     if (session.step === "ex_name") {
       session.name = text;
       session.step = "ex_date";
       await setState(session);
-      await sendMessage(chatId, "На какую дату хотите записаться?", noKeyboard);
+      await sendMessage(chatId, "На какую дату хотите записаться?", flowKeyboard);
       return new Response("OK");
     }
 
@@ -386,7 +407,7 @@ export default {
       session.date = text;
       session.step = "ex_time";
       await setState(session);
-      await sendMessage(chatId, "Во сколько? (например, 11:30 / 15:30 (летом))", noKeyboard);
+      await sendMessage(chatId, "Во сколько? (например, 11:30 / 15:30 (летом))", flowKeyboard);
       return new Response("OK");
     }
 
@@ -394,7 +415,7 @@ export default {
       session.time = text;
       session.step = "ex_people";
       await setState(session);
-      await sendMessage(chatId, "Сколько гостей будет?", noKeyboard);
+      await sendMessage(chatId, "Сколько гостей будет?", flowKeyboard);
       return new Response("OK");
     }
 
@@ -402,7 +423,7 @@ export default {
       session.people = text;
       session.step = "ex_contact";
       await setState(session);
-      await sendMessage(chatId, "Ваш телефон или Telegram?", noKeyboard);
+      await sendMessage(chatId, "Ваш телефон или Telegram?", flowKeyboard);
       return new Response("OK");
     }
 
@@ -453,6 +474,6 @@ export default {
     // Fallback
     await sendMessage(chatId, "Спасибо! Мы свяжемся с вами.", mainKeyboard);
     return new Response("OK");
+    // === /USER FLOW ==========================================================
   },
 };
-

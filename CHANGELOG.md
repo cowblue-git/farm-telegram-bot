@@ -9,6 +9,12 @@ ___
 ## 2026-01-17
 
 ### Fixed
+- reset/menu available during booking flow
+
+
+## 2026-01-17
+
+### Fixed
 - Устранены зависания Telegram-бота, связанные с отсутствием KV bindings и переменных окружения при Git → Cloudflare Workers Builds деплое.
 - Восстановлена корректная работа webhook (исправлены 500 Internal Server Error).
 - Приведена в порядок конфигурация `wrangler.toml` как единого источника bindings и vars.
