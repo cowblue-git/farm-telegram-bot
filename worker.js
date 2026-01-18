@@ -458,7 +458,29 @@ export default {
     }
 
     if (session.step === "ex_contact") {
-      session.contact = text;
+      const contact = (text || "").trim();
+
+      // Validate contact: phone or @telegram
+      // Telegram username: starts with @, [a-zA-Z0-9_], length 5–33 incl. @
+      const isValidTelegram = /^@[a-zA-Z0-9_]{4,32}$/.test(contact);
+
+      // Phone: allow +, spaces, parentheses, hyphens; after stripping non-digits length 10–15
+      const isPhoneLike = /^[0-9+\s()\-]+$/.test(contact);
+      const digitsOnly = contact.replace(/\D/g, "");
+      const isValidPhone = isPhoneLike && digitsOnly.length >= 10 && digitsOnly.length <= 15;
+
+      if (!isValidTelegram && !isValidPhone) {
+        // stay on ex_contact, do not change step
+        await sendMessage(
+          chatId,
+          "Пожалуйста, укажите корректный контакт.\nТелефон (например: +7 999 123-45-67) или Telegram-ник (@username).",
+          flowKeyboard
+        );
+        await sendMessage(chatId, "Ваш телефон или Telegram?", flowKeyboard);
+        return new Response("OK");
+      }
+
+      session.contact = contact;
 
       const peopleNum = parseInt(session.people || "0", 10) || 0;
 
