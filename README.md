@@ -118,14 +118,22 @@ ___
    git checkout -b feature/<scope>
    ```
 3. **Одно изменение = один коммит** (предпочтительно).
-4. Создать PR в GitHub и выполнить **Squash and merge**.
-5. После merge:
-   ```bash
-   git checkout main
-   git pull
-   ```
-6. Ветка удаляется (GitHub UI / локально).
+4. Создать PR в GitHub и выполнить **Squash and merge** в `main`.
+5. В GitHub UI нажать кнопку **Delete branch**  
+   (это считается ручным удалением ветки).
+6. После merge и удаления ветки обновить локальный `main`:
+    ```bash
+    git checkout main
+    git pull
+    ```
+7. При необходимости удалить локальную ветку:
+    ```bash
+git branch -d feature/<scope>
+    ```
 
+> Примечание: удаление ветки выполняется через GitHub UI  
+> (кнопка **Delete branch** после Squash & merge).  
+> Удаление локальной ветки — опциональная чистка.
 ---
 
 NY legacy удалён и события будут возвращены модульно.
