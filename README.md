@@ -100,6 +100,33 @@ ___
 - UX-изменения не должны затрагивать инфраструктурную конфигурацию.
 
 ---
+## Development workflow (branches & PR)
+
+### Базовые правила
+- `main` — **source of truth** и production.
+- Все рабочие ветки создаются **только от `main`**.
+- `baseline-*` (git tag) используется **только как reference/rollback**, не как база разработки.
+
+### Процесс работы
+1. Обновить `main`:
+   ```bash
+   git checkout main
+   git pull
+   ```
+2. Создать рабочую ветку:
+   ```bash
+   git checkout -b feature/<scope>
+   ```
+3. **Одно изменение = один коммит** (предпочтительно).
+4. Создать PR в GitHub и выполнить **Squash and merge**.
+5. После merge:
+   ```bash
+   git checkout main
+   git pull
+   ```
+6. Ветка удаляется (GitHub UI / локально).
+
+---
 
 NY legacy удалён и события будут возвращены модульно.
 
